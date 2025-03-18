@@ -1,0 +1,48 @@
+name: Android C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3  # 检出代码仓库
+
+    - name: 缓存 Android NDK
+      id: ndk-cache
+      uses: actions/cache@v3
+      with:
+        path: /tmp/android-ndk-r25b  # 缓存路径
+        key: android-ndk-r25b        # 缓存键
+        restore-keys: |
+          android-ndk-r25b
+
+    - name: 下载 Android NDK（如果未缓存）
+      if: steps.ndk-cache.outputs.cache-hit != 'true'
+      run: |
+        wget https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+        unzip android-ndk-r25b-linux.zip -d /tmp
+        echo "NDK_HOME=/tmp/android-ndk-r25b" >> $GITHUB_ENV
+
+    - name: 设置 NDK 环境变量
+      run: echo "NDK_HOME=/tmp/android-ndk-r25b" >> $GITHUB_ENV
+
+    - name: 编译 main.cpp（使用静态链接）
+      run: |
+        $NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang++ \
+          -static-libstdc++ \
+          main.cpp -o main
+        chmod +x main  # 确保可执行文件具有执行权限
+
+    - name: 上传二进制文件作为构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-build-artifacts  # 构建产物的名称
+        path: ./main                   # 要上传的文件路径
